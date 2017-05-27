@@ -1,0 +1,108 @@
+import numpy as np
+import math
+import cv2
+
+def smoothImage(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    ret, threshold = cv2.threshold(blur, 100, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # filtered = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 41, 3)
+
+    return threshold
+
+
+def cleanImage(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    filtered = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 41, 3)
+
+    kernel = np.ones((1, 1), np.uint8)
+    opening = cv2.morphologyEx(filtered, cv2.MORPH_OPEN, kernel)
+    closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, kernel)
+    img = smoothImage(img)
+    or_img = cv2.bitwise_or(img, closing)
+    return or_img
+
+def connectedComponent(img, blur, canny):
+
+    # ret, thresh = cv2.threshold(img, 127, 255, 0)
+    if blur:
+        blur = cv2.medianBlur(img,1)
+    if canny:
+        canny = cv2.Canny(blur,100,200)
+    cv2.imshow("cca",canny)
+    while True:
+        k = cv2.waitKey(5)
+        if k % 0x100 == 27:
+            break
+    im2, contours, hierarchy = cv2.findContours(canny,
+                                        cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(img, contours, -1, (255, 0, 0))
+    cv2.imshow("cca",img)
+
+    while True:
+        k = cv2.waitKey(5)
+        if k % 0x100 == 27:
+            break
+    return img
+
+
+img = cv2.imread('scene.jpeg')
+vis = img.copy()
+swt = img.copy()
+gray = img.copy()
+
+# img = connectedComponent(img, 1, 1)
+# clean = cleanImage(img)
+
+mser = cv2.MSER_create()
+
+# gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+gray = cv2.Canny(gray,100,200)
+
+regions, _ = mser.detectRegions(swt.astype(np.uint8))
+
+hulls = [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
+
+cv2.polylines(vis, hulls, 1, (0, 255, 0))
+
+cv2.imshow("cca",vis)
+while True:
+    k = cv2.waitKey(5)
+    if k % 0x100 == 27:
+        break
+
+gray = cv2.cvtColor(vis, cv2.COLOR_BGR2GRAY)
+
+# regions, _ = mser.detectRegions(gray)
+#
+# hulls = [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
+
+# cv2.polylines(vis, hulls, 1, (0, 255, 0))
+
+swt = cv2.distanceTransform(gray, cv2.DIST_L2, 5).astype(np.float32) # distance transform
+gray = gray.astype(np.float32)
+_, max_val, _, _ = cv2.minMaxLoc(swt)
+strokeRadius = int(math.ceil(max_val))
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+
+print("strokeRadius: ", strokeRadius)
+
+for x in range(0, strokeRadius):
+    swt = cv2.dilate(swt,kernel,iterations = 1) # assign the max in 3x3 neighborhood to each center pixel
+    swt = np.multiply(swt,gray)
+
+cv2.imshow("cca",swt)
+while True:
+    k = cv2.waitKey(5)
+    if k % 0x100 == 27:
+        break
+
+# gray = cv2.cvtColor(swt.astype(np.uint8))
+
+    # swt32f = swt32f.mul(bw32f); # apply mask to restore original shape and to avoid unnecessary max propogation
+
+
+
+# canny = cv2.Canny(vis,100,200)
+
+# cv2.imwrite("cca.jpg",img)
